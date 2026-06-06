@@ -37,7 +37,14 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(0)
 	// Setze den HTTP-Statuscode auf 200 OK
 	w.WriteHeader(http.StatusOK)
+}
 
+func HealthzHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	w.WriteHeader(http.StatusOK)
+
+	w.Write([]byte("OK"))
 }
 
 func main() {
@@ -45,7 +52,9 @@ func main() {
 	fileServer := http.FileServer(http.Dir("."))
 
 	mux := http.NewServeMux()
-	mux.Handle("/", fileServer)
+	mux.Handle("/app/", http.StripPrefix("/app/", fileServer))
+
+	mux.HandleFunc("/healthz", HealthzHandler)
 
 	mux.Handle("/app", cfg.middlewareMetricsInc(fileServer))
 	mux.HandleFunc("/reset", cfg.handlerReset)
