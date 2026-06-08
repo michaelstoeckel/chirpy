@@ -23,14 +23,19 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	// Setze den Content-Type Header auf Plain Text
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	// Setze den HTTP-Statuscode auf 200 OK
 	w.WriteHeader(http.StatusOK)
 
 	// Lies den aktuellen Wert sicher aus und schreibe ihn in die Response
 	hits := cfg.fileserverHits.Load()
-	fmt.Fprintf(w, "Hits: %d", hits)
+	fmt.Fprintf(w, ` 
+	<html> 
+	  <body> 
+	    <h1>Welcome, Chirpy Admin</h1> <p>Chirpy has been visited %d times!</p>
+      </body>
+    </html>`, hits)
 }
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
@@ -52,13 +57,13 @@ func main() {
 	fileServer := http.FileServer(http.Dir("."))
 
 	mux := http.NewServeMux()
-	mux.Handle("/app/", http.StripPrefix("/app/", fileServer))
 
-	mux.HandleFunc("/healthz", HealthzHandler)
+	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fileServer)))
 
-	mux.Handle("/app", cfg.middlewareMetricsInc(fileServer))
-	mux.HandleFunc("/reset", cfg.handlerReset)
-	mux.HandleFunc("/metrics", cfg.handlerMetrics)
+	mux.HandleFunc("GET /api/healthz", HealthzHandler)
+
+	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
+	mux.HandleFunc("GET /admin/metrics", cfg.handlerMetrics)
 
 	server := &http.Server{
 		Addr:    ":8080",
